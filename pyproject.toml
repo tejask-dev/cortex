@@ -1,0 +1,37 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cortex-brain"
+version = "0.1.0"
+description = "Local-first memory and context bus for AI agents. One brain. Every model."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{name = "Cortex contributors"}]
+dependencies = ["mcp>=2.3.0,<3", "PyYAML>=6.0.3,<7", "rich>=14,<16"]
+
+[project.scripts]
+cortex = "cortex.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=9,<10", "ruff>=0.17,<0.18", "mypy>=2.4,<3", "types-PyYAML>=6", "pip-audit>=2.10,<3"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cortex"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src/cortex"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
