@@ -177,7 +177,11 @@ class Brain:
         notes, errors = self._scan()
         signature = hashlib.sha256(
             json.dumps(
-                [(n["path"], n["hash"], n["file_modified"]) for n in notes], sort_keys=True
+                {
+                    "index_schema": 1,
+                    "notes": [(n["path"], n["hash"], n["file_modified"]) for n in notes],
+                },
+                sort_keys=True,
             ).encode()
         ).hexdigest()
         previous = connection.execute("SELECT value FROM state WHERE key='signature'").fetchone()

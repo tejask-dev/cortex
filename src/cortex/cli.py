@@ -194,13 +194,17 @@ def diagnostics(brain: Brain) -> dict[str, Any]:
 def backup(brain: Brain, output: Path | None) -> dict[str, Any]:
     notes = brain.snapshot()
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    destination = (
-        (output or brain.root / ".cortex/backups" / f"brain-{stamp}-{uuid.uuid4().hex[:6]}.tar.gz")
-        .expanduser()
-        .absolute()
-    )
-    destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    fd = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+    if output is None:
+        relative = f".cortex/backups/brain-{stamp}-{uuid.uuid4().hex[:6]}.tar.gz"
+        destination = brain.root / relative
+        with brain.boundary.parent(relative, internal=True, create=True) as (parent, name):
+            fd = os.open(name, flags, 0o600, dir_fd=parent)
+    else:
+        # Explicit exports may target a user-selected location outside the vault.
+        destination = output.expanduser().absolute()
+        destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        fd = os.open(destination, flags, 0o600)
     with os.fdopen(fd, "wb") as stream, tarfile.open(fileobj=stream, mode="w:gz") as archive:
         for path, data in notes:
             item = tarfile.TarInfo(path)
