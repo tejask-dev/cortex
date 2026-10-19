@@ -1,0 +1,41 @@
+{
+  "dataset": "15 synthetic linked notes plus 6 starter notes",
+  "checks": [
+    {
+      "case": "exact title at rank 1",
+      "passed": true
+    },
+    {
+      "case": "keyword retrieval",
+      "passed": true
+    },
+    {
+      "case": "source provenance",
+      "passed": true
+    },
+    {
+      "case": "graph relationship traversal",
+      "passed": true
+    },
+    {
+      "case": "old conflicting decision excluded",
+      "passed": true
+    },
+    {
+      "case": "stale knowledge filtered",
+      "passed": true
+    },
+    {
+      "case": "recent activity",
+      "passed": true
+    },
+    {
+      "case": "semantic paraphrase (no embeddings)",
+      "passed": false
+    }
+  ],
+  "passed": 7,
+  "total": 8,
+  "query_ms": 93.35,
+  "limitations": "Small deterministic smoke benchmark, not a general retrieval evaluation. Semantic paraphrase is expected to miss; embeddings are not implemented."
+}

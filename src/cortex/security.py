@@ -19,15 +19,19 @@ class CortexError(ValueError):
 
 def check_secrets(text: str) -> None:
     """Reject obvious credentials; this is a heuristic, not a secret detector guarantee."""
+    if len(text) > MAX_NOTE_BYTES or len(text.encode("utf-8")) > MAX_NOTE_BYTES:
+        raise CortexError("Note exceeds the 1 MiB limit.")
     patterns = (
-        r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----",
-        r"\bAKIA[0-9A-Z]{16}\b",
-        r"\b(?:ghp|gho|github_pat)_[A-Za-z0-9_]{20,}\b",
+        r"-----BEGIN (?:RSA |EC |DSA |OPENSSH |ENCRYPTED )?PRIVATE KEY-----",
+        r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b",
+        r"\b(?:ghp|gho|ghs|ghu|ghr|github_pat)_[A-Za-z0-9_]{20,}\b",
         r"\bsk-(?:proj-)?[A-Za-z0-9_-]{24,}\b",
-        r"(?im)^\s*(?:api[_-]?key|secret[_-]?key|password|access[_-]?token)\s*[:=]\s*\S{8,}",
+        r"(?im)^[ \t]*(?:api[_-]?key|secret[_-]?key|password|access[_-]?token)[ \t]*[:=][ \t]*\S{8,}",
     )
     if any(re.search(pattern, text) for pattern in patterns):
-        raise CortexError("Possible credential detected; remove it before storing or reading this note.")
+        raise CortexError(
+            "Possible credential detected; remove it before storing or reading this note."
+        )
 
 
 class Boundary:
@@ -40,7 +44,9 @@ class Boundary:
         self.root = expanded.resolve()
         home = Path.home().resolve()
         if self.root in {Path("/"), home} or any(p.startswith(".") for p in self.root.parts):
-            raise CortexError("Use a dedicated, non-hidden vault directory, not a home/system root.")
+            raise CortexError(
+                "Use a dedicated, non-hidden vault directory, not a home/system root."
+            )
         if not self.root.is_dir():
             raise CortexError("Vault not initialized. Run cortex init PATH first.")
 
@@ -50,7 +56,8 @@ class Boundary:
             raise CortexError("Invalid vault path.")
         parts = PurePosixPath(path).parts
         if (
-            path.startswith("/")
+            "/".join(parts) != path
+            or path.startswith("/")
             or ".." in parts
             or any(p.startswith(".") for p in parts if not (internal and p == ".cortex"))
             or any(p.casefold() in {"node_modules", "credentials", "secrets"} for p in parts)
@@ -61,7 +68,9 @@ class Boundary:
         return parts
 
     @contextmanager
-    def parent(self, path: str, *, create: bool = False, internal: bool = False) -> Iterator[tuple[int, str]]:
+    def parent(
+        self, path: str, *, create: bool = False, internal: bool = False
+    ) -> Iterator[tuple[int, str]]:
         parts = self.parts(path, internal=internal)
         fd = os.open(self.root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
         try:
@@ -83,16 +92,21 @@ class Boundary:
     def read(self, path: str, *, internal: bool = False) -> bytes:
         with self.parent(path, internal=internal) as (parent, name):
             fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
-            with os.fdopen(fd, "rb") as stream:
-                info = os.fstat(stream.fileno())
+            try:
+                info = os.fstat(fd)
                 if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
                     raise CortexError("Only regular, non-linked files are permitted.")
-                data = stream.read(MAX_NOTE_BYTES + 1)
-                if len(data) > MAX_NOTE_BYTES:
-                    raise CortexError("Note exceeds the 1 MiB limit.")
-                return data
+                with os.fdopen(fd, "rb", closefd=False) as stream:
+                    data = stream.read(MAX_NOTE_BYTES + 1)
+                    if len(data) > MAX_NOTE_BYTES:
+                        raise CortexError("Note exceeds the 1 MiB limit.")
+                    return data
+            finally:
+                os.close(fd)
 
-    def write(self, path: str, data: bytes, *, replace: bool = False, internal: bool = False) -> None:
+    def write(
+        self, path: str, data: bytes, *, replace: bool = False, internal: bool = False
+    ) -> None:
         if len(data) > MAX_NOTE_BYTES:
             raise CortexError("Note exceeds the 1 MiB limit.")
         with self.parent(path, create=True, internal=internal) as (parent, name):
@@ -105,7 +119,12 @@ class Boundary:
             ):
                 raise CortexError("Destination exists or is unsafe; refusing to overwrite.")
             temporary = f".cortex-tmp-{uuid.uuid4().hex}"
-            fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=parent)
+            fd = os.open(
+                temporary,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                0o600,
+                dir_fd=parent,
+            )
             try:
                 with os.fdopen(fd, "wb") as stream:
                     stream.write(data)
@@ -115,7 +134,9 @@ class Boundary:
                     os.replace(temporary, name, src_dir_fd=parent, dst_dir_fd=parent)
                 else:
                     # link is an atomic create-if-absent; the temporary name is removed immediately.
-                    os.link(temporary, name, src_dir_fd=parent, dst_dir_fd=parent, follow_symlinks=False)
+                    os.link(
+                        temporary, name, src_dir_fd=parent, dst_dir_fd=parent, follow_symlinks=False
+                    )
                     os.unlink(temporary, dir_fd=parent)
                 os.fsync(parent)
             finally:
@@ -127,7 +148,9 @@ class Boundary:
     def note_paths(self) -> list[str]:
         paths: list[str] = []
         for directory, dirs, files in os.walk(self.root, followlinks=False):
-            dirs[:] = sorted(d for d in dirs if not d.startswith(".") and not (Path(directory) / d).is_symlink())
+            dirs[:] = sorted(
+                d for d in dirs if not d.startswith(".") and not (Path(directory) / d).is_symlink()
+            )
             for name in sorted(files):
                 if name.endswith(".md") and not name.startswith("."):
                     path = (Path(directory) / name).relative_to(self.root).as_posix()
