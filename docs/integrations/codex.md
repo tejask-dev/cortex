@@ -40,7 +40,7 @@ Preview first. Installation adds Cortex's hook definitions and concise durable-m
 
 | Event | Cortex behavior |
 | --- | --- |
-| `SessionStart` | Return bounded context and retrieval guidance. |
+| `SessionStart` | Return bounded confirmed identity/preference/goal context and retrieval guidance. Candidates and session notes are not automatically injected. |
 | `UserPromptSubmit` | Return a brief memory-workflow reminder without persisting the prompt. |
 | `PreCompact`, `Stop`, `SessionEnd` | Safe no-ops in v0.1. They do not extract facts from a transcript. |
 

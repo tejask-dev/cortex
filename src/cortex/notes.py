@@ -164,12 +164,12 @@ def render_note(note: dict[str, Any]) -> bytes:
     }
     extra = yaml.safe_load(note.get("_extra_yaml", "")) or {}
     fields = {**extra, **fields}
+    # Leading indentation and trailing spaces carry Markdown semantics.
+    content = note["content"]
+    if not content.endswith("\n"):
+        content += "\n"
     result: str = (
-        "---\n"
-        + yaml.safe_dump(fields, sort_keys=False, allow_unicode=True)
-        + "---\n\n"
-        + note["content"].strip()
-        + "\n"
+        "---\n" + yaml.safe_dump(fields, sort_keys=False, allow_unicode=True) + "---\n\n" + content
     )
     check_secrets(result)
     return result.encode("utf-8")

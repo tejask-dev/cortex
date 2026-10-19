@@ -132,7 +132,7 @@ Tests cover process concurrency, real stdio MCP calls, rebuilds, provenance, mal
 
 The [synthetic benchmark](examples/benchmark-results.json) measures exact/keyword retrieval, graph traversal, provenance, stale filtering, conflicting decisions and activity. It also includes a semantic paraphrase case that lexical search misses. This is a small smoke benchmark, not evidence of general recall quality. Embeddings are deliberately absent.
 
-Current limits: every query scans Markdown for freshness, so large vaults need measurement; no file watcher or semantic search; no PDF/attachment ingestion; no background transcript summarization; no HTTP server for MCP; no irreversible delete tool. Custom YAML fields are retained across updates, with normalized formatting. The [memory model](docs/memory-model.md) specifies the schema. Uncooperative external editors can still race after the final hash check. Backups contain validated Markdown, not attachments or version history.
+Current limits: every query scans Markdown for freshness, so large vaults need measurement; no file watcher or semantic search; no PDF/attachment ingestion; no background transcript summarization; no HTTP server for MCP; no irreversible delete tool. Custom YAML fields are retained across updates, with normalized formatting and comments removed. The [memory model](docs/memory-model.md) specifies the strict schema; incompatible properties are reported and excluded, and must be fixed before backup. Uncooperative external editors can still race after the final hash check. Backups contain validated Markdown, not attachments or version history; an interrupted backup may leave an incomplete archive that must not be treated as successful.
 
 ## Prior art and roadmap
 

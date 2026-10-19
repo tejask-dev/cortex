@@ -77,7 +77,7 @@ cortex --brain "$HOME/Brain" update MEMORY_ID --hash HASH_FROM_READ \
 
 Replace the example text with deliberately chosen information. `MEMORY_ID` and `HASH_FROM_READ` are placeholders returned by the preceding commands. A stale hash requires a new read and review; do not automatically retry a conflicting write.
 
-Identical captures with the same title, content, provenance, type, status and tags are deduplicated. This is exact deduplication, not semantic merging. Contradictory notes remain separate evidence until someone resolves them. To retire an old decision, link the replacement first, then use the returned hash to set the old note's status to superseded. Adding a link changes content and returns the note to candidate status, so the order matters.
+Identical captures with the same title, content, provenance, type, status and tags are deduplicated. A missing final newline is normalized; indentation and trailing spaces remain significant Markdown content. This is exact deduplication, not semantic merging. Contradictory notes remain separate evidence until someone resolves them. To retire an old decision, link the replacement first, then use the returned hash to set the old note's status to superseded. Adding a link changes content and returns the note to candidate status, so the order matters.
 
 ## Relations, age and activity
 

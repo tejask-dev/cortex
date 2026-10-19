@@ -249,7 +249,7 @@ def test_duplicate_remember_preserves_identity_without_creating_another_file(
         "Orion", "Unique durable fact.", source="codex", source_ref="synthetic:task"
     )
     second = brain.remember(
-        "Orion", "  Unique durable fact.\n", source="codex", source_ref="synthetic:task"
+        "Orion", "Unique durable fact.\n", source="codex", source_ref="synthetic:task"
     )
     assert second["deduplicated"] is True
     assert second["id"] == first["id"]

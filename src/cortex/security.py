@@ -43,7 +43,7 @@ class Boundary:
             raise CortexError("Vault root must not be a symlink.")
         self.root = expanded.resolve()
         home = Path.home().resolve()
-        if self.root in {Path("/"), home} or any(p.startswith(".") for p in self.root.parts):
+        if home.is_relative_to(self.root) or any(p.startswith(".") for p in self.root.parts):
             raise CortexError(
                 "Use a dedicated, non-hidden vault directory, not a home/system root."
             )

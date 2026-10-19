@@ -43,29 +43,37 @@ class Brain:
         self.boundary = Boundary(Path(root))
         self.root = self.boundary.root
         internal = self.root / ".cortex"
-        if internal.is_symlink():
-            raise CortexError("Internal state directory must not be a symlink.")
-        internal.mkdir(mode=0o700, exist_ok=True)
+        try:
+            config = json.loads(self.boundary.read(".cortex/config.json", internal=True))
+        except (CortexError, ValueError, OSError) as exc:
+            raise CortexError(
+                "Vault is not initialized or its marker is invalid. Run cortex init PATH."
+            ) from exc
+        if (
+            not isinstance(config, dict)
+            or type(config.get("schema")) is not int
+            or config["schema"] != 1
+        ):
+            raise CortexError("Unsupported vault schema. Expected .cortex/config.json schema 1.")
         self.db_path = internal / "brain.sqlite"
 
     @classmethod
     def initialize(cls, root: Path | str) -> Brain:
         target = Path(root).expanduser().absolute()
-        if target.is_symlink() or target.resolve() in {Path("/"), Path.home().resolve()}:
+        if target.is_symlink() or Path.home().resolve().is_relative_to(target.resolve()):
             raise CortexError("Choose a dedicated vault directory.")
         if any(p.startswith(".") for p in target.parts):
             raise CortexError("Vault cannot be in a hidden directory.")
         target.mkdir(mode=0o700, parents=True, exist_ok=True)
+        boundary = Boundary(target)
+        config_path = ".cortex/config.json"
+        if not (target / config_path).exists():
+            boundary.write(config_path, b'{"schema": 1}\n', internal=True)
         brain = cls(target)
         with brain._locked():
             for folder in FOLDERS:
                 with brain.boundary.parent(f"{folder}/placeholder.md", create=True):
                     pass
-            config_path = ".cortex/config.json"
-            if not (target / config_path).exists():
-                brain.boundary.write(
-                    config_path, b'{"schema": 1, "stale_days": 90}\n', internal=True
-                )
             for filename, title in (
                 ("about-me", "About me"),
                 ("preferences", "Preferences"),
@@ -178,7 +186,7 @@ class Brain:
         signature = hashlib.sha256(
             json.dumps(
                 {
-                    "index_schema": 1,
+                    "index_schema": 2,
                     "notes": [(n["path"], n["hash"], n["file_modified"]) for n in notes],
                 },
                 sort_keys=True,
@@ -238,7 +246,8 @@ class Brain:
     @staticmethod
     def _select(db: sqlite3.Connection, identifier: str) -> dict[str, Any]:
         row = db.execute(
-            "SELECT record FROM notes WHERE path=? OR id=?", (identifier, identifier)
+            "SELECT record FROM notes WHERE path=? OR id=? ORDER BY CASE WHEN path=? THEN 0 ELSE 1 END LIMIT 1",
+            (identifier, identifier, identifier),
         ).fetchone()
         if row is None:
             raise CortexError(
@@ -476,7 +485,8 @@ class Brain:
             for existing in self._records(db):
                 if (
                     existing["title"] == note["title"]
-                    and existing["content"].strip() == content.strip()
+                    and existing["content"]
+                    == (content if content.endswith("\n") else content + "\n")
                     and existing["source"] == source
                     and existing["source_ref"] == source_ref
                     and existing["type"] == kind
@@ -540,6 +550,8 @@ class Brain:
         if not target or len(target) > 200 or any(c in target for c in "[]\n\r"):
             raise CortexError("Invalid wiki-link target.")
         note = self.read(identifier)
+        if note["hash"] != expected_hash:
+            raise CortexError("Note changed since it was read. Read it again before linking.")
         if target in note["links"]:
             return note
         return self.update(
